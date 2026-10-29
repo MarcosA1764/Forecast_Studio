@@ -2,6 +2,8 @@
 import csv
 import hashlib
 import json
+import os
+import shutil
 import sys
 import webbrowser
 from collections import deque
@@ -18,24 +20,58 @@ from forecast_engine import (DEFAULT_PARAMS, METHODS, SAMPLE, explain, forecast,
                              period_label, score_methods, series_by_grain, step, table_by_grain)
 from staffing import DEFAULT_ASSUMPTIONS, PAID_BASELINES, plan_for
 
-BASE = Path(__file__).parent
-DATA = BASE / "data" / "incoming.txt"
+FROZEN = bool(getattr(sys, "frozen", False))
+if FROZEN:
+    # PyInstaller --onefile extracts bundled files here; it is read-only and temporary.
+    BASE = Path(getattr(sys, "_MEIPASS", Path(sys.executable).resolve().parent))
+    USER_DATA = Path(os.environ.get("FORECASTSTUDIO_DATA") or
+                     (Path(os.environ.get("LOCALAPPDATA") or Path.home()) / "ForecastStudio" / "data"))
+else:
+    BASE = Path(__file__).resolve().parent
+    USER_DATA = BASE / "data"
+
+USER_DATA.mkdir(parents=True, exist_ok=True)
+
+DATA = USER_DATA / "incoming.txt"
 STATE = {"rows": SAMPLE, "status": "Sample data · 7 weeks (built-in)", "version": 0,
          "origin": "sample", "synced": ""}
 _CACHE = {}
 _BACKTEST_CACHE = {}
-META = BASE / "data" / "meta.json"
+META = USER_DATA / "meta.json"
 
 ORIGIN_LABEL = {"sample": "Sample data", "sheet": "Google Sheet", "file": "Uploaded file", "paste": "Pasted data"}
 
-SOURCE = BASE / "data" / "source.json"
-OFFICIAL = BASE / "data" / "official.json"
-OFFICIAL_HISTORY = BASE / "data" / "official.json.history"
-FORECAST_HISTORY_CSV = BASE / "data" / "forecast_history.csv"
-BACKTEST_DIR = BASE / "data" / "backtest"
+SOURCE = USER_DATA / "source.json"
+OFFICIAL = USER_DATA / "official.json"
+OFFICIAL_HISTORY = USER_DATA / "official.json.history"
+FORECAST_HISTORY_CSV = USER_DATA / "forecast_history.csv"
+BACKTEST_DIR = USER_DATA / "backtest"
 CSV_HEADER = ["saved_at", "snapshot_id", "default", "period_index", "period_label", "method",
               "manual", "official_value", "best_method", "best_value", "actual_value"]
 GOOGLE_HOST = "docs.google.com"
+
+
+def prepare_user_data():
+    """Create the writable data directory and install first-run seeds.
+
+    In a PyInstaller one-file build, BASE/_MEIPASS is temporary and read-only.
+    The seed files are copied once to USER_DATA; later runs preserve user data.
+    """
+    USER_DATA.mkdir(parents=True, exist_ok=True)
+    if not FROZEN:
+        return
+
+    seed_dir = BASE / "data"
+    for filename, seed_name in (("official.json", "official.seed.json"),
+                                ("incoming.txt", "incoming.txt")):
+        target = USER_DATA / filename
+        seed = seed_dir / seed_name
+        if not target.exists() and seed.exists():
+            shutil.copyfile(seed, target)
+
+    if not OFFICIAL.exists():
+        OFFICIAL.write_text(json.dumps({"default": "auto", "periods": {}}, ensure_ascii=False, indent=2),
+                            encoding="utf-8")
 
 
 def clean_official(payload):
@@ -53,7 +89,7 @@ def clean_official(payload):
 
 def load_official():
     try:
-        official = json.loads(OFFICIAL.read_text(encoding="utf-8")) if OFFICIAL.exists() else {}
+        official = json.loads(OFFICIAL.read_text(encoding="utf-8-sig")) if OFFICIAL.exists() else {}
         return clean_official(official)
     except Exception:  # noqa: BLE001
         return {"default": "auto", "periods": {}}
@@ -66,7 +102,7 @@ def save_official(official):
 
 def load_history():
     try:
-        data = json.loads(OFFICIAL_HISTORY.read_text(encoding="utf-8")) if OFFICIAL_HISTORY.exists() else []
+        data = json.loads(OFFICIAL_HISTORY.read_text(encoding="utf-8-sig")) if OFFICIAL_HISTORY.exists() else []
         return data if isinstance(data, list) else []
     except Exception:  # noqa: BLE001
         return []
@@ -100,7 +136,7 @@ def append_history(official, saved_at):
 
 def load_source():
     try:
-        return json.loads(SOURCE.read_text(encoding="utf-8")) if SOURCE.exists() else {}
+        return json.loads(SOURCE.read_text(encoding="utf-8-sig")) if SOURCE.exists() else {}
     except Exception:  # noqa: BLE001
         return {}
 
@@ -536,11 +572,11 @@ def _rotate_history_csv():
     if lines <= 5001:                       # header + <= 5000 data rows
         return
     stamp = datetime.now().strftime("%Y-%m")
-    target = BASE / "data" / f"forecast_history_{stamp}.csv"
+    target = USER_DATA / f"forecast_history_{stamp}.csv"
     n = 1
     while target.exists():
         n += 1
-        target = BASE / "data" / f"forecast_history_{stamp}_{n}.csv"
+        target = USER_DATA / f"forecast_history_{stamp}_{n}.csv"
     try:
         FORECAST_HISTORY_CSV.replace(target)
     except OSError as e:
@@ -685,9 +721,11 @@ class Handler(BaseHTTPRequestHandler):
         pass
 
 if __name__ == "__main__":
+    prepare_user_data()
+
     if DATA.exists():
         try:
-            meta = json.loads(META.read_text(encoding="utf-8")) if META.exists() else {}
+            meta = json.loads(META.read_text(encoding="utf-8-sig")) if META.exists() else {}
             load_rows(DATA.read_text(encoding="utf-8-sig"), meta.get("origin", "file"))
             if meta.get("synced"):
                 STATE["synced"] = meta["synced"]
@@ -697,6 +735,21 @@ if __name__ == "__main__":
     port = 8000
     host = "127.0.0.1"
     url = "http" + "://" + host + ":" + str(port)
-    print("Forecast Studio -> " + url + "   (Ctrl+C para detener)")
-    webbrowser.open(url)
+
+    print(flush=True)
+    print("=" * 60, flush=True)
+    print(f"  Your App is running on the Local Server : {url}", flush=True)
+    print("=" * 60, flush=True)
+    print("  Close this window to stop the server.", flush=True)
+    print(flush=True)
+
+    import threading
+    import time
+
+    def _open_browser():
+        time.sleep(1.0)
+        webbrowser.open(url)
+
+    if not os.environ.get("FORECASTSTUDIO_NO_BROWSER"):
+        threading.Thread(target=_open_browser, daemon=True).start()
     ThreadingHTTPServer((host, port), Handler).serve_forever()

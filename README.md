@@ -4,7 +4,22 @@ Local workforce-forecasting and staffing tool. A Python standard-library HTTP se
 (`server.py`) serves `index.html` and exposes a small JSON API; the numeric engine lives in
 `forecast_engine.py` and the headcount model in `staffing.py`.
 
-Requirements: Python 3.10+ (standard library only). No external packages.
+Requirements: Python 3.10+ (standard library only) at runtime. No runtime packages.
+Building the optional Windows executable uses PyInstaller (development-only).
+
+
+## How to run
+
+1. Download `ForecastStudio.exe` from the [latest release](https://github.com/MarcosA1764/Forecast_Studio/releases/latest).
+2. Double-click it. A console window opens and your browser opens to http://127.0.0.1:8000.
+3. Use the app. Your saved forecasts persist in `%LOCALAPPDATA%\ForecastStudio\data\`.
+4. Close the console window to stop the server.
+
+> Windows SmartScreen may warn about the unsigned executable. Click "More info" → "Run anyway".
+> Requires Windows. Port 8000 must be free.
+
+
+
 
 ## Run
 
@@ -18,6 +33,73 @@ startup; otherwise the built-in sample (7 weeks) is used. The current 27.5 MB da
 15,401 rows. Its longest series is **daily = 1,024 points** (weekly = 148, monthly = 34), so a
 5,000/15,000-point check is done on a deterministic synthetic series (see
 `check_backtest.py`).
+
+## Windows executable (PyInstaller)
+
+The server supports a PyInstaller one-file build. The executable contains read-only resources
+(`index.html` and the empty official seed) while all writable state goes to the user's profile.
+
+### Build
+
+```powershell
+python -m pip install pyinstaller
+pyinstaller --noconfirm --clean --onefile --console --name ForecastStudio `
+  --add-data "index.html;." `
+  --add-data "data/official.seed.json;data" `
+  server.py
+```
+
+The output is `dist\ForecastStudio.exe`. To ship the real dataset as the first-run data, add:
+
+```powershell
+  --add-data "data/incoming.txt;data" `
+```
+
+This increases the executable by roughly 27 MB. Without it the client starts with the built-in
+sample and can upload a CSV from the UI.
+
+The same build is available as a script:
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File .\build_exe.ps1
+# Include the 27 MB dataset:
+powershell -NoProfile -ExecutionPolicy Bypass -File .\build_exe.ps1 -WithData
+# Show the command without building:
+powershell -NoProfile -ExecutionPolicy Bypass -File .\build_exe.ps1 -DryRun
+```
+
+### Where data lives
+
+In a frozen build:
+
+- `BASE` is `sys._MEIPASS` (temporary, read-only bundle).
+- `index.html` and `data/official.seed.json` are read from the bundle.
+- `incoming.txt`, `meta.json`, `source.json`, `official.json`, `official.json.history`,
+  `forecast_history.csv` and `backtest/` live in
+  `%LOCALAPPDATA%\ForecastStudio\data\` and survive restarts.
+- `FORECASTSTUDIO_DATA` overrides that directory (useful for a portable/test run).
+- JSON state files are read with `utf-8-sig`, so a hand-edited file with a UTF-8 BOM is
+  tolerated.
+- The empty `data/official.seed.json` is copied to `official.json` only when the user has no
+  official state. Do **not** add the working `data/official.json` to the bundle: it contains
+  the current saved versions and should not become another client's seed.
+
+The app prints:
+
+```text
+============================================================
+  Your App is running on the Local Server : http://127.0.0.1:8000
+============================================================
+  Close this window to stop the server.
+```
+
+and opens the browser about one second after startup. Closing the console window stops it.
+To remove the application, delete the `.exe` and the
+`%LOCALAPPDATA%\ForecastStudio\data` folder.
+
+An unsigned PyInstaller executable can trigger Windows SmartScreen ("Windows protected your
+PC"). The client can use **More info → Run anyway**; avoiding that warning requires a purchased
+code-signing certificate. Test the build on a machine without Python before delivery.
 
 ## Data sources
 

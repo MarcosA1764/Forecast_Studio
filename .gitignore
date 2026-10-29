@@ -26,3 +26,8 @@ Thumbs.db
 .vscode/
 .idea/
 *.swp
+
+# PyInstaller build artifacts
+build/
+dist/
+*.spec.bak
