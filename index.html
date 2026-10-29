@@ -93,7 +93,7 @@ td.pick{display:none}
     <header class="top">
       <div><small>WORKFORCE FORECAST</small><h1 id="title"></h1></div>
       <div class="f">
-        <select id="form"></select>
+        <!-- Form filter intentionally hidden; S.form stays "All forms" internally. -->
         <select id="business"></select>
         <select id="grain"><option value="daily">Daily</option><option value="weekly">Weekly</option><option value="monthly" selected>Monthly</option></select>
         <select id="channel"></select>
@@ -409,7 +409,6 @@ function render(){
   document.getElementById("srcPaste").style.display=S.srcMode==="paste"?"block":"none";
   const names={sample:"Sample data (built-in)",sheet:"Google Sheets",file:"Uploaded file",paste:"Pasted data"};
   document.getElementById("srcInfo").innerHTML="Active: <b>"+esc(names[S.origin]||S.origin)+"</b>"+(S.synced?" · updated "+esc(S.synced):"")+(S.origin!=="sample"&&S.srcMode!==S.origin&&S.srcMode!=="sheet"?"<br>Loading from this mode will replace the current data.":"");
-  const fs=document.getElementById("form");fs.innerHTML=S.forms.map(f=>`<option ${f===S.form?"selected":""}>${esc(f)}</option>`).join("");
   const bs=document.getElementById("business");
   bs.innerHTML=S.businesses.map(b=>`<option ${b===S.business?"selected":""}>${esc(b)}</option>`).join("");
   const cs=document.getElementById("channel");
@@ -435,7 +434,6 @@ function render(){
   ensureHistory();
 }
 document.getElementById("nav").onclick=e=>{const b=e.target.closest("button");if(b){S.page=b.dataset.page;render();}};
-document.getElementById("form").onchange=e=>{S.form=e.target.value;refresh();};
 document.getElementById("business").onchange=e=>{S.business=e.target.value;Object.assign(S.a,S.baselines[S.business]||{});refresh();};
 document.getElementById("grain").onchange=e=>{S.grain=e.target.value;refresh();};
 document.getElementById("channel").onchange=e=>{S.channel=e.target.value;refresh();};
