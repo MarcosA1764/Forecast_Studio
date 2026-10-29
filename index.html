@@ -94,9 +94,9 @@ td.pick{display:none}
       <div><small>WORKFORCE FORECAST</small><h1 id="title"></h1></div>
       <div class="f">
         <select id="form"></select>
-        <select id="business"><option>Overall</option><option>Kipu</option><option>Equinox</option></select>
+        <select id="business"></select>
         <select id="grain"><option value="daily">Daily</option><option value="weekly">Weekly</option><option value="monthly" selected>Monthly</option></select>
-        <select id="channel"><option>Total</option><option>Voice</option><option value="Messaging">Chat / Messaging</option><option>Email</option></select>
+        <select id="channel"></select>
       </div>
     </header>
     <div class="grid" id="view"></div>
@@ -119,7 +119,7 @@ td.pick{display:none}
 
 <script>
 const NAV=[["overview","Headcount overview"],["data","Data explorer"],["methods","Forecast methods"],["calculations","Official forecast"],["staffing","Staffing planner"]];
-const S={page:"overview",channel:"Total",form:"All forms",business:"Overall",grain:"monthly",override:"auto",inspect:"auto",params:{},explorerGrain:"weekly",official:{default:"auto",periods:{}},savedOfficial:null,a:{},baselines:{},forms:[],res:null,error:"",status:"",latestWeek:"",history:null,historyError:"",backtestRange:"all"};
+const S={page:"overview",channel:"Total",form:"All forms",business:"Overall",grain:"monthly",override:"auto",inspect:"auto",params:{},explorerGrain:"weekly",official:{default:"auto",periods:{}},savedOfficial:null,a:{},baselines:{},forms:[],businesses:[],channels:[],res:null,error:"",status:"",latestWeek:"",history:null,historyError:"",backtestRange:"all"};
 const COLORS=["#5b67f1","#15a889","#f59e0b","#ec4899","#8b5cf6","#334155","#06b6d4"];
 const fmt=n=>Math.round(n).toLocaleString("en-US"),pct=n=>n.toFixed(1)+"%",esc=s=>String(s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
 const gapTag=(g,hire="Need +")=>`<i class="${g>=0?"good":"bad"}">${g===0?"Fully utilized":(g>0?"Surplus ":hire)+Math.abs(g)}</i>`;
@@ -132,6 +132,9 @@ function applyState(st){
   if(!S.srcMode)S.srcMode=(S.origin==="file"||S.origin==="paste")?S.origin:"sheet";
   S.status=st.status;
   S.forms=st.forms;
+  S.businesses=Array.isArray(st.businesses)?st.businesses:["Overall"];
+  S.channels=Array.isArray(st.channels)?st.channels:["Total","Voice","Messaging","Email"];
+  if(!S.businesses.includes(S.business))S.business="Overall";
   S.source=st.source||{};
   S.latestWeek=st.latestWeek;
   S.baselines=st.baselines;
@@ -407,7 +410,11 @@ function render(){
   const names={sample:"Sample data (built-in)",sheet:"Google Sheets",file:"Uploaded file",paste:"Pasted data"};
   document.getElementById("srcInfo").innerHTML="Active: <b>"+esc(names[S.origin]||S.origin)+"</b>"+(S.synced?" · updated "+esc(S.synced):"")+(S.origin!=="sample"&&S.srcMode!==S.origin&&S.srcMode!=="sheet"?"<br>Loading from this mode will replace the current data.":"");
   const fs=document.getElementById("form");fs.innerHTML=S.forms.map(f=>`<option ${f===S.form?"selected":""}>${esc(f)}</option>`).join("");
-  document.getElementById("business").value=S.business;document.getElementById("grain").value=S.grain;document.getElementById("channel").value=S.channel;
+  const bs=document.getElementById("business");
+  bs.innerHTML=S.businesses.map(b=>`<option ${b===S.business?"selected":""}>${esc(b)}</option>`).join("");
+  const cs=document.getElementById("channel");
+  cs.innerHTML=S.channels.map(c=>`<option value="${esc(c)}" ${c===S.channel?"selected":""}>${esc(c==="Messaging"?"Chat / Messaging":c)}</option>`).join("");
+  document.getElementById("grain").value=S.grain;
   const v=document.getElementById("view");
   if(!S.res){v.innerHTML=S.error?`<div class="error">${esc(S.error)}</div>`:"";return;}
     v.innerHTML=(S.error?`<div class="error">${esc(S.error)}</div>`:"")+({overview,data,methods,calculations,staffing})[S.page](S.res);

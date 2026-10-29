@@ -204,11 +204,13 @@ CHANNELS = ("Voice", "Messaging", "Email")
 # ---------------------------------------------------------------- datos
 def state_payload():
     rows = STATE["rows"]
-    
-    
+    businesses = sorted({r.get("business") for r in rows
+                         if r.get("business") and r.get("business") not in ("Unspecified", "Overall")})
     return {
         "status": STATE["status"],
         "forms": ["All forms"] + sorted({r["form"] for r in rows}),
+        "businesses": ["Overall"] + businesses,
+        "channels": ["Total", "Voice", "Messaging", "Email"],
         "latestWeek": max((r["week"] for r in rows), default=""),
         "defaults": DEFAULT_ASSUMPTIONS,
         "baselines": PAID_BASELINES,

@@ -115,6 +115,11 @@ version, clears the compute/backtest caches, persists `data/incoming.txt`, and r
 origin/sync time in `data/meta.json`. A dataset change therefore takes effect without
 restarting the server.
 
+The **Business** filter is generated from the loaded rows: `Overall` is always first,
+`Unspecified` and empty values are omitted, and the remaining names are sorted. If the
+selected business disappears after a new upload, the UI falls back to `Overall`. The
+**Channel** filter is fixed to Total, Voice, Messaging and Email.
+
 ## Views
 
 - **Headcount overview** — the three-series volume outlook (Actual, Official backtest, Best),
