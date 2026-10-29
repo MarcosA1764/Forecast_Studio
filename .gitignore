@@ -1,0 +1,28 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+.venv/
+venv/
+env/
+
+# Runtime state
+data/forecast_history.csv
+data/forecast_history_*.csv
+data/backtest/
+data/meta.json
+data/official.json.history
+data/source.json
+*.log
+
+# Datos locales (no commiteables por tamaño)
+data/incoming.txt
+
+# Sistema
+.DS_Store
+Thumbs.db
+
+# Editor
+.vscode/
+.idea/
+*.swp

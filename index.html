@@ -1,0 +1,484 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Forecast & Staffing Planner</title>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<style>
+*{box-sizing:border-box}body{margin:0;background:#f5f7fb;color:#172033;font:15px/1.4 system-ui,Segoe UI,Roboto,sans-serif}
+#loading{position:fixed;inset:0;z-index:40;display:none;place-items:center;background:#f5f7fb99;backdrop-filter:blur(1px)}
+#loading span{display:flex;align-items:center;gap:10px;background:#fff;border:1px solid #d9dcfb;border-radius:12px;padding:12px 18px;font-size:.85rem;font-weight:700;color:#414cce;box-shadow:0 12px 30px #0f172a22}
+#loading i{width:16px;height:16px;border:3px solid #d9dcfb;border-top-color:#5662e8;border-radius:50%;animation:spin .8s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+.busy .panel,.busy .metrics,.busy .recommend{opacity:.45;pointer-events:none;transition:opacity .15s}
+.source select{width:100%;margin:6px 0 8px;padding:7px;border-radius:8px;border:1px solid #3a4666;background:#2f3b5e;color:#dbe0f0;font:inherit;font-size:.75rem}
+.source .srcInfo{display:block;color:#8a94a6;font-size:.68rem;margin-top:8px;line-height:1.4}
+.source .srcInfo b{display:inline;color:#c7d0e4;font-size:.68rem;margin:0}
+.shell{display:grid;grid-template-columns:252px minmax(0,1fr);min-height:100vh}
+.params{display:grid;grid-template-columns:repeat(4,1fr);gap:11px;padding:10px 18px 16px;align-items:end}.params label{display:grid;gap:5px;font-size:.7rem;color:#566278;font-weight:700}.params small{color:#929bad;font-weight:500}
+.steps{padding:6px 18px 14px;font-size:.78rem}.steps code{display:block;background:#f7f8fb;border:1px solid #e2e6ef;border-radius:9px;padding:10px 12px;margin-bottom:10px;font-size:.74rem;color:#414cce;white-space:pre-wrap}.steps ol{margin:0;padding-left:20px}.steps li{margin:4px 0;color:#4a566d}.steps .res{margin-top:10px;font-weight:800;color:#0b8667}
+.tabs{display:flex;gap:6px;padding:0 18px 10px}.tabs button{border:1px solid #dde2ec;background:#fff;border-radius:9px;padding:6px 12px;font:inherit;font-size:.76rem;cursor:pointer}.tabs button.active{background:#5662e8;border-color:#5662e8;color:#fff}
+.side{position:sticky;top:0;height:100vh;background:linear-gradient(180deg,#18213a,#11192d);color:#fff;padding:26px 18px 20px;display:flex;flex-direction:column}
+.brand{display:flex;align-items:center;gap:12px;padding:0 8px 28px}.brand b{display:grid;place-items:center;width:40px;height:40px;border-radius:12px;background:linear-gradient(145deg,#7380ff,#4a55d7)}
+.brand strong{display:block;font-size:1rem}.brand small{color:#98a3bc;font-size:.75rem}
+nav{display:grid;gap:7px}nav button{display:grid;grid-template-columns:25px 1fr;align-items:center;gap:9px;border:0;border-radius:11px;background:transparent;color:#aeb7cb;padding:11px 12px;text-align:left;font-size:.875rem;font-weight:600;cursor:pointer}
+nav em{display:grid;place-items:center;width:22px;height:22px;border-radius:7px;background:#2a3654;color:#9ba6bd;font-size:.7rem;font-style:normal}
+nav button.active{background:#2a3554;color:#fff}nav button.active em{background:#6874ee;color:#fff}
+.source{margin-top:auto;border:1px solid #313c5a;background:#202b47;border-radius:14px;padding:14px;font-size:.75rem}.source b{display:block;font-size:.84rem;margin-bottom:6px}.source p{color:#aab4c9;min-height:32px;margin:0 0 8px}
+.source button,.source label{display:block;width:100%;border:0;background:#2f3b5e;color:#dbe0f0;border-radius:8px;padding:7px;margin-top:6px;text-align:center;cursor:pointer;font-size:.75rem}.source input[type=file]{display:none}
+.top{height:91px;background:#fff;border-bottom:1px solid #e2e6ef;display:flex;align-items:center;justify-content:space-between;padding:16px 30px;position:sticky;top:0;z-index:10}
+.top small{color:#79849a;font-size:.68rem;font-weight:800;letter-spacing:.12em}.top h1{font-size:1.42rem;margin:3px 0 0}.top .f{display:flex;gap:10px}
+select,input{border:1px solid #dde2ec;border-radius:9px;padding:8px 10px;font:inherit;background:#fff}
+.grid{display:grid;grid-template-columns:minmax(0,1.15fr) minmax(350px,.85fr);gap:18px;padding:22px 30px 36px}
+.wide,.notice,.recommend,.metrics{grid-column:1/-1}
+.notice,.recommend{display:flex;align-items:center;justify-content:space-between;border-radius:13px;padding:12px 16px}
+.notice{background:#eef8f5;border:1px solid #cfeadf;color:#187458}.recommend{background:linear-gradient(110deg,#eef0ff,#f6f2ff);border:1px solid #d9dcfb;color:#414cce}
+.notice b,.recommend b{display:block;font-size:.85rem}.notice small,.recommend small{font-size:.72rem;color:#66847a}.recommend small{color:#747ea7}
+.error{grid-column:1/-1;background:#fff0f1;border:1px solid #f3c6cb;color:#c83345;border-radius:13px;padding:12px 16px;font-size:.8rem}
+.metrics{display:grid;grid-template-columns:repeat(4,1fr);gap:14px}
+.metric{background:#fff;border:1px solid #e2e6ef;border-radius:15px;padding:16px;display:flex;gap:12px}
+.metric span{display:grid;place-items:center;width:38px;height:38px;border-radius:11px;font-weight:800}.metric .green{background:#e8f7f2;color:#0b8667}.metric .red{background:#fff0f1;color:#c83345}.metric .blue{background:#edf0ff;color:#5360df}
+.metric p{margin:0;font-size:.72rem;color:#6e7a90}.metric strong{display:block;font-size:1.05rem}.metric small{font-size:.7rem;color:#8b95a7}
+.panel{background:#fff;border:1px solid #e2e6ef;border-radius:16px;overflow:hidden}.panel>header{padding:16px 18px 6px}.panel h2{margin:0;font-size:.95rem}.panel header p{margin:3px 0 0;font-size:.74rem;color:#7b869a}
+details.panel>summary{list-style:none;cursor:pointer;padding:16px 18px 10px;position:relative}details.panel>summary::-webkit-details-marker{display:none}details.panel>summary:after{content:"▾";position:absolute;right:18px;top:15px;color:#7b869a;font-size:.75rem}details.panel[open]>summary:after{content:"▴"}details.panel>summary .panelTitle{display:block;font-size:.95rem;font-weight:700;color:#172033}details.panel>summary small{display:block;margin-top:3px;font-size:.74rem;color:#7b869a;padding-right:22px}details.panel>.panelBody{padding-bottom:2px}
+.horizon{display:flex;gap:8px 20px;flex-wrap:wrap;padding:4px 18px 12px;font-size:.73rem;color:#6e7a90}.horizon b{color:#414cce}.warn{color:#b26a00;font-weight:700}
+.btmetrics{padding:2px 18px 10px;font-size:.78rem;color:#414cce;font-weight:800}
+.chart{padding:8px 14px 10px}.legend{display:flex;gap:14px;flex-wrap:wrap;font-size:.72rem;color:#5d6880;padding:4px 8px}.legend i{display:inline-block;width:10px;height:10px;border-radius:3px;margin-right:5px;vertical-align:-1px}
+.tablewrap{overflow:auto;max-height:410px}table{border-collapse:collapse;width:100%;font-size:.77rem}
+th{position:sticky;top:0;background:#f8f9fc;color:#6e7a90;text-align:right;font-size:.68rem;text-transform:uppercase;letter-spacing:.045em;padding:11px 14px;border-bottom:1px solid #e2e6ef;white-space:nowrap}
+th:first-child,td:first-child{text-align:left}td{text-align:right;padding:10px 14px;border-bottom:1px solid #edf0f5;color:#4a566d;white-space:nowrap}td b{color:#263148}
+td i{display:inline-flex;padding:3px 8px;border-radius:999px;font-size:.68rem;font-weight:800;font-style:normal}.good{background:#e8f7f2;color:#0b8667}.bad{background:#fff0f1;color:#c83345}.best{margin-left:7px;background:#edf0ff;color:#5360df}
+.formula{display:flex;gap:9px;background:#f7f8fb;border-top:1px solid #e2e6ef;padding:12px 18px}.formula b{display:block;font-size:.73rem;color:#5662e8}.formula small{font-size:.68rem;color:#7b869a}
+.assumptions{display:grid;grid-template-columns:repeat(7,1fr);gap:11px;padding:10px 18px 16px}.assumptions label{display:grid;gap:5px;font-size:.7rem;color:#566278;font-weight:700}.assumptions small{color:#929bad;font-weight:500}
+.ranking{padding:4px 16px 14px}.ranking>div{display:grid;grid-template-columns:32px 1fr auto;align-items:center;gap:10px;padding:10px 8px;border-bottom:1px solid #edf0f5;font-size:.76rem}.ranking .winner{background:#f1f3ff;border:1px solid #dfe2ff;border-radius:10px}
+.ranking em{display:grid;place-items:center;width:25px;height:25px;border-radius:8px;background:#f0f2f7;font-style:normal;font-weight:800;font-size:.72rem}.ranking .winner em{background:#5b67eb;color:#fff}.ranking small{display:block;color:#8b95a7;font-size:.66rem}
+.backdrop{position:fixed;inset:0;z-index:50;background:#11182780;display:grid;place-items:center;padding:20px}.modal{width:min(520px,100%);background:#fff;border-radius:18px;padding:22px}
+.modal h2{margin:0 0 4px;font-size:1.05rem}.modal p{margin:0 0 16px;font-size:.76rem;color:#788399}.modal label{display:grid;gap:6px;margin-top:12px;font-size:.78rem;font-weight:600}.modal footer{display:flex;justify-content:flex-end;gap:8px;margin-top:20px}
+.btn{border:1px solid #dde2ec;background:#fff;border-radius:9px;padding:8px 14px;font:inherit;cursor:pointer}.btn.primary{background:#5662e8;border-color:#5662e8;color:#fff}
+.official-badge{background:#e8f7f2;color:#0b8667;border-radius:999px;padding:3px 9px;font-size:.7rem;font-weight:800}
+.official-badge.dirty{background:#fff7e6;color:#b26a00}
+.btn[disabled]{opacity:.5;cursor:not-allowed}
+td.pick{display:none}
+.recommend .tools{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+@media(max-width:900px){.shell{display:block}.side{position:static;height:auto}.grid{grid-template-columns:1fr;padding:14px}.metrics{grid-template-columns:1fr 1fr}.assumptions{grid-template-columns:1fr 1fr}.top{height:auto;flex-direction:column;align-items:flex-start;gap:10px}.top .f{flex-wrap:wrap}}
+</style>
+</head>
+<body>
+<main class="shell">
+  <aside class="side">
+    <div class="brand"><b>✦</b><span><strong>Forecast Studio</strong><small>Workforce planning</small></span></div>
+    <nav id="nav"></nav>
+    <div class="source">
+  <b>Data source</b>
+  <p id="status">Loading…</p>
+  <select id="srcMode" aria-label="Data source mode">
+    <option value="sheet">Google Sheets (live link)</option>
+    <option value="file">Upload CSV / TSV file</option>
+    <option value="paste">Paste data</option>
+  </select>
+  <div id="srcSheet">
+    <button id="sheetBtn">Connect Google Sheets</button>
+    <button id="linkBtn" style="display:none">Change Google Sheets link</button>
+  </div>
+  <div id="srcFile" style="display:none">
+    <label>Choose a CSV / TSV file<input type="file" id="file" accept=".csv,.tsv,.txt,text/csv"></label>
+  </div>
+  <div id="srcPaste" style="display:none">
+    <button id="pasteBtn">Paste data from Google Sheets</button>
+  </div>
+  <small class="srcInfo" id="srcInfo"></small>
+</div>
+  </aside>
+  <section>
+    <header class="top">
+      <div><small>WORKFORCE FORECAST</small><h1 id="title"></h1></div>
+      <div class="f">
+        <select id="form"></select>
+        <select id="business"><option>Overall</option><option>Kipu</option><option>Equinox</option></select>
+        <select id="grain"><option value="daily">Daily</option><option value="weekly">Weekly</option><option value="monthly" selected>Monthly</option></select>
+        <select id="channel"><option>Total</option><option>Voice</option><option value="Messaging">Chat / Messaging</option><option>Email</option></select>
+      </div>
+    </header>
+    <div class="grid" id="view"></div>
+  </section>
+</main>
+<div id="loading"><span><i></i>Recalculating…</span></div>
+<div id="sheetModal" class="backdrop" style="display:none">
+  <section class="modal">
+    <h2>Connect Google Sheets</h2>
+    <p>Paste the sheet link. Best option: <b>File &gt; Share &gt; Publish to web &gt; Incoming &gt; CSV</b> and copy that link. A normal edit link also works if the sheet is shared as "Anyone with the link - Viewer". The link is remembered for one-click refresh.</p>
+    <label>Google Sheet URL<input id="gurl" placeholder="Paste the Google Sheets link here"></label>
+    <label>Tab name (only used when the link has no gid)<input id="gtab" value="Incoming"></label>
+    <footer>
+      <button class="btn" id="gcancel">Cancel</button>
+      <button class="btn primary" id="gok">Connect and refresh</button>
+    </footer>
+  </section>
+</div>
+<div id="modal"></div>
+
+<script>
+const NAV=[["overview","Headcount overview"],["data","Data explorer"],["methods","Forecast methods"],["calculations","Official forecast"],["staffing","Staffing planner"]];
+const S={page:"overview",channel:"Total",form:"All forms",business:"Overall",grain:"monthly",override:"auto",inspect:"auto",params:{},explorerGrain:"weekly",official:{default:"auto",periods:{}},savedOfficial:null,a:{},baselines:{},forms:[],res:null,error:"",status:"",latestWeek:"",history:null,historyError:"",backtestRange:"all"};
+const COLORS=["#5b67f1","#15a889","#f59e0b","#ec4899","#8b5cf6","#334155","#06b6d4"];
+const fmt=n=>Math.round(n).toLocaleString("en-US"),pct=n=>n.toFixed(1)+"%",esc=s=>String(s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+const gapTag=(g,hire="Need +")=>`<i class="${g>=0?"good":"bad"}">${g===0?"Fully utilized":(g>0?"Surplus ":hire)+Math.abs(g)}</i>`;
+const chName=c=>c==="Messaging"?"Chat":c;
+
+async function api(path,body){const r=await fetch(path,{method:"POST",headers:{"content-type":"application/json"},body:typeof body==="string"?body:JSON.stringify(body||{})});const d=await r.json();if(!r.ok)throw new Error(d.error||"Request failed");return d;}
+function applyState(st){
+  S.origin=st.origin||"sample";
+  S.synced=st.synced||"";
+  if(!S.srcMode)S.srcMode=(S.origin==="file"||S.origin==="paste")?S.origin:"sheet";
+  S.status=st.status;
+  S.forms=st.forms;
+  S.source=st.source||{};
+  S.latestWeek=st.latestWeek;
+  S.baselines=st.baselines;
+  S.defaultParams=st.params;
+  S.official=st.official||{default:"auto",periods:{}};
+  S.savedOfficial=JSON.parse(JSON.stringify(S.official));
+  if(!Object.keys(S.a).length)S.a={...st.defaults};
+  if(!Object.keys(S.params).length)S.params={...st.params};
+  if(!S.forms.includes(S.form))S.form=S.forms.includes("EMR Default Form")?"EMR Default Form":"All forms";
+}
+async function init(){try{applyState(await (await fetch("/api/state")).json());}catch(e){S.error=e.message}await refresh();}
+let _req=0;
+async function refresh(){
+  const my=++_req;
+  S.error="";
+  document.getElementById("loading").style.display="grid";
+  document.getElementById("view").classList.add("busy");
+  try{
+    const res=await api("/api/compute",{
+      channel:S.channel,form:S.form,business:S.business,grain:S.grain,
+      override:S.override,inspect:S.inspect,params:S.params,assumptions:S.a,official:S.official
+    });
+    if(my!==_req)return;           // a newer request superseded this one
+    S.res=res;
+  }catch(e){if(my!==_req)return;S.error=e.message;}
+  document.getElementById("loading").style.display="none";
+  document.getElementById("view").classList.remove("busy");
+  render();
+}
+/* ---------- SVG chart: series = [{name,data,type:'line'|'bar'|'area',color}] ---------- */
+function chart(labels,series,H=300){
+  const W=900,P={l:56,r:16,t:16,b:42},iw=W-P.l-P.r,ih=H-P.t-P.b,n=labels.length;
+  const all=series.flatMap(s=>s.data).filter(v=>v!=null),max=Math.max(1,...all)*1.1;
+  const x=i=>P.l+(n>1?i*iw/(n-1):iw/2),y=v=>P.t+ih-v/max*ih;
+  let svg=`<svg viewBox="0 0 ${W} ${H}" width="100%" style="display:block">`;
+  for(let g=0;g<=4;g++){const v=max*g/4,yy=y(v);svg+=`<line x1="${P.l}" x2="${W-P.r}" y1="${yy}" y2="${yy}" stroke="#e5e9f1" stroke-dasharray="3 3"/><text x="${P.l-8}" y="${yy+4}" text-anchor="end" font-size="11" fill="#7a8599">${fmt(v)}</text>`;}
+  const bars=series.filter(s=>s.type==="bar"),bw=n?Math.min(42,iw/n*.7/Math.max(bars.length,1)):0;
+  bars.forEach((s,bi)=>s.data.forEach((v,i)=>{if(v==null)return;const cx=x(i)-bars.length*bw/2+bi*bw;svg+=`<rect x="${cx}" y="${y(v)}" width="${bw}" height="${Math.max(0,y(0)-y(v))}" fill="${s.color}" rx="4"><title>${esc(labels[i])} · ${esc(s.name)}: ${fmt(v)}</title></rect>`;}));
+  series.filter(s=>s.type!=="bar").forEach(s=>{const pts=[];s.data.forEach((v,i)=>{if(v!=null)pts.push([x(i),y(v),v,i]);});if(!pts.length)return;const d=pts.map((p,i)=>(i?"L":"M")+p[0]+","+p[1]).join(" ");
+    if(s.type==="area")svg+=`<path d="${d} L${pts[pts.length-1][0]},${y(0)} L${pts[0][0]},${y(0)} Z" fill="${s.color}" opacity=".12"/>`;
+    svg+=`<path d="${d}" fill="none" stroke="${s.color}" stroke-width="${s.width||2.5}"${s.dash?' stroke-dasharray="6 4"':""}/>`;pts.forEach(p=>svg+=`<circle cx="${p[0]}" cy="${p[1]}" r="3" fill="${s.color}"><title>${esc(labels[p[3]])} · ${esc(s.name)}: ${fmt(p[2])}</title></circle>`);});
+  const every=Math.ceil(n/12);labels.forEach((l,i)=>{if(i%every)return;svg+=`<text x="${x(i)}" y="${H-P.b+20}" text-anchor="middle" font-size="11" fill="#7a8599">${esc(l)}</text>`;});
+  return `<div class="chart">${svg}</svg><div class="legend">${series.map(s=>`<span><i style="background:${s.color}"></i>${esc(s.name)}</span>`).join("")}</div></div>`;
+}
+function forecastView(r){
+  const h=r.history.length,H=r.futureLabels.length;
+  const labels=[...r.history.map(x=>x.label),...r.futureLabels];
+  const actual=[...r.history.map(x=>x.value),...r.futureLabels.map(()=>null)];
+  const offOk=Array.isArray(r.backtestOfficial)&&r.backtestOfficial.length===h;
+  const bestOk=Array.isArray(r.backtestBest)&&r.backtestBest.length===h;
+  const official=offOk?[...r.backtestOfficial,...r.future]:[...Array(h).fill(null),...r.future];
+  if(!offOk&&h)official[h-1]=r.history[h-1].value;
+  const series=[{name:"Actual",data:actual,type:"line",color:"#1f2937",width:2},
+    {name:`Official (${r.officialMethod||r.officialDefault||r.method})`,data:official,type:"line",color:"#5b67f1",width:3}];
+  const bestFuture=(r.comparison&&r.comparison[r.bestMethod])||[];
+  if(offOk&&bestOk&&bestFuture.length===H)
+    series.push({name:`Best (${r.bestMethod})`,data:[...r.backtestBest,...bestFuture],type:"line",color:"#f59e0b",width:1.5,dash:true});
+  return {labels,series,offOk,bestOk};
+}
+const panel=(t,sub,body,wide=false)=>`<section class="panel${wide?" wide":""}"><header><h2>${esc(t)}</h2>${sub?`<p>${esc(sub)}</p>`:""}</header>${body}</section>`;
+const panelDetails=(t,sub,body,wide=false,open=true)=>`<details class="panel${wide?" wide":""}"${open?" open":""}><summary><span class="panelTitle">${esc(t)}</span>${sub?`<small>${esc(sub)}</small>`:""}</summary><div class="panelBody">${body}</div></details>`;
+const table=(head,rows)=>`<div class="tablewrap"><table><thead><tr>${head.map(h=>`<th>${h}</th>`).join("")}</tr></thead><tbody>${rows.join("")}</tbody></table></div>`;
+
+/* ---------- vistas ---------- */
+function overview(r){
+  const tn=r.channelNeeds.reduce((s,x)=>s+x.required,0),tp=r.channelNeeds.reduce((s,x)=>s+x.available,0),tg=tp-tn;
+  const fv=forecastView(r);
+  return `<div class="notice"><span><b>${esc(S.form)} · ${r.periodName} view</b><small>${esc(S.status)} · Latest week: ${esc(S.latestWeek)}</small></span></div>
+  <div class="metrics"><div class="metric"><span class="${tg>=0?"green":"red"}">Σ</span><div><p>Total headcount needed</p><strong>${tn} required</strong><small>${tp} paid · ${tg===0?"fully utilized":tg>0?"surplus "+tg:"additional "+(-tg)+" needed"}</small></div></div>
+  ${r.channelNeeds.map(x=>`<div class="metric"><span class="${x.gap>=0?"green":"red"}">${chName(x.channel)[0]}</span><div><p>${chName(x.channel)} staffing need</p><strong>${x.required} required</strong><small>${x.available} paid · ${x.channel!=="Email"?x.offPaid+" on weekend/midnight · ":""}${esc(r.methods[x.method])}</small></div></div>`).join("")}</div>
+  ${panel(`${S.form} ${r.periodName.toLowerCase()} volume outlook`,`Actual, one-step-ahead official backtest and statistical best · ${r.officialSaved?"with period overrides":"method "+r.methods[r.method]} · next ${r.horizon} ${r.periodName.toLowerCase()}s${fv.offOk?"":" · Backtest no disponible"}`,chart(fv.labels,fv.series,340),true)}
+  ${panel("Channel staffing comparison",`Next-${r.periodName.toLowerCase()} requirement versus paid headcount`,chart(r.channelNeeds.map(x=>chName(x.channel)),[{name:"Required HC",data:r.channelNeeds.map(x=>x.required),type:"bar",color:"#5b67f1"},{name:"Paid HC",data:r.channelNeeds.map(x=>x.available),type:"bar",color:"#10a37f"}],260))}
+  ${panel(`${r.periodName} forecast table`,`${chName(S.channel)} forecast translated into staffing need`,table([r.periodName,"Volume","Required","Paid","Gap"],r.staff.map(x=>`<tr><td><b>${esc(x.period)}</b></td><td>${fmt(x.value)}</td><td>${x.required}</td><td>${x.available}</td><td>${gapTag(x.gap)}</td></tr>`)))}
+  ${panel("Voice & Chat 24/7 coverage",`Required headcount for the selected ${r.periodName.toLowerCase()} is calculated separately for regular and weekend/midnight coverage.`,table(["Channel","Coverage period","Forecast volume","Volume share","Required HC","Paid HC","Gap"],r.coverage.map(x=>`<tr><td><b>${x.channel}</b></td><td>${x.segment}</td><td>${fmt(x.volume)}</td><td>${pct(x.share)}</td><td>${x.required}</td><td>${x.paid}</td><td>${gapTag(x.gap,"Hire ")}</td></tr>`)),true)}`;
+}
+function methods(r){
+  const keys=Object.keys(r.methods),ex=r.explanation,p=S.params;
+  const fmtCell=v=>typeof v==="number"?v.toLocaleString("en-US",{maximumFractionDigits:4}):esc(v);
+  return `<div class="recommend"><span><b>Recommended: ${esc(r.methods[r.scores[0].method])}</b><small>Lowest weighted indicator score · ${S.grain} data · seasonal period ${r.seasonPeriod}</small></span>
+  <select id="override"><option value="auto">Automatic selection</option>${keys.map(k=>`<option value="${k}" ${S.override===k?"selected":""}>${esc(r.methods[k])}</option>`).join("")}</select></div>
+  ${panel("Model parameters","Type your own smoothing constants (0–1). They feed the forecast, the ranking and the inspector.",
+    `<div class="params">
+      <label>Exponential α<small>single smoothing</small><input type="number" min="0" max="1" step="0.01" data-p="alpha" value="${p.alpha}"></label>
+      <label>Double exponential α<small>level</small><input type="number" min="0" max="1" step="0.0001" data-p="dAlpha" value="${p.dAlpha}"></label>
+      <label>Double exponential β<small>trend</small><input type="number" min="0" max="1" step="0.0001" data-p="dBeta" value="${p.dBeta}"></label>
+      <button class="btn" id="resetParams">Reset to Excel defaults</button>
+    </div>`,true)}
+  ${panel("Forecast comparison",`Seven expert-model methods for the next ${r.horizon} ${r.periodName.toLowerCase()}s`,chart(r.futureLabels,keys.map((k,i)=>({name:r.methods[k],data:r.comparison[k],type:"line",color:COLORS[i],width:k===r.method?3:1.5})),340),true)}
+  ${panel("Method inspector · "+esc(ex.title),"Formula, step-by-step arithmetic with your actual data, and intermediate values",
+    `<div class="tabs"><span style="font-size:.76rem;color:#6e7a90;align-self:center;margin-right:6px">Inspect:</span><select id="inspect"><option value="auto">Selected method</option>${keys.map(k=>`<option value="${k}" ${S.inspect===k?"selected":""}>${esc(r.methods[k])}</option>`).join("")}</select></div>
+     <div class="steps"><code>${esc(ex.formula)}</code><ol>${ex.steps.map(s=>`<li>${esc(s)}</li>`).join("")}</ol>${ex.result!=null?`<div class="res">Next-period forecast = ${fmt(ex.result)}</div>`:""}</div>
+     ${table(ex.columns,ex.rows.map(row=>`<tr>${row.map((c,i)=>`<td>${i?fmtCell(c):`<b>${fmtCell(c)}</b>`}</td>`).join("")}</tr>`))}`,true)}
+  ${panel("Model ranking","MAPE 30% · WAPE 40% · stability indicators 30%",`<div class="ranking">${r.scores.map((s,i)=>`<div class="${i?"":"winner"}"><em>${i+1}</em><span><b>${esc(r.methods[s.method])}</b><small>Score ${s.score.toFixed(2)}</small></span><strong>${pct(s.wape)} WAPE</strong></div>`).join("")}</div>`)}
+  ${panel("Indicator calculations",`${r.periodName} accuracy and statistical stability`,table(["Method","MAPE","WAPE","Corr.","Std. dev.","Score"],r.scores.map((s,i)=>`<tr><td><b>${esc(r.methods[s.method])}</b>${i?"":'<i class="best">Best</i>'}</td><td>${pct(s.mape)}</td><td>${pct(s.wape)}</td><td>${s.correlation.toFixed(2)}</td><td>${fmt(s.stdev)}</td><td>${s.score.toFixed(2)}</td></tr>`)))}`;
+}
+function mapeFor(r,arr,indices){
+  if(!Array.isArray(arr)||!indices.length)return null;
+  let sum=0,count=0;
+  for(const i of indices){const actual=r.history[i]?r.history[i].value:0,v=arr[i];if(v==null)continue;sum+=Math.abs(actual-v)/Math.max(actual,1);count++;}
+  return count?sum/count*100:null;
+}
+function backtestPanel(r){
+  const h=r.history.length,off=r.backtestOfficial,best=r.backtestBest;
+  if(!Array.isArray(off)||off.length!==h)
+    return panel("Backtest vs. actual","One-step-ahead official and best forecast on the historical range",`<div class="btmetrics"><span class="warn">Backtest no disponible</span></div>`,true);
+  const n=S.backtestRange==="all"?h:Math.min(h,Number(S.backtestRange)||h);
+  const indices=[];for(let i=Math.max(0,h-n);i<h;i++)indices.push(i);
+  const mapeO=mapeFor(r,off,indices),mapeB=mapeFor(r,best,indices);
+  const rows=indices.map(i=>{
+    const actual=r.history[i].value,o=off[i],b=best&&best[i];
+    return `<tr><td><b>${esc(r.history[i].label)}</b></td><td>${fmt(actual)}</td><td>${o==null?"—":fmt(o)}</td><td>${b==null?"—":fmt(b)}</td><td>${o==null?"—":fmt(Math.abs(actual-o))}</td><td>${b==null?"—":fmt(Math.abs(actual-b))}</td></tr>`;
+  });
+  const rangeSel=`<select id="btRange">${[["12","12"],["24","24"],["52","52"],["all","All"]].map(([v,l])=>`<option value="${v}" ${S.backtestRange===v?"selected":""}>${l}</option>`).join("")}</select>`;
+  return panel("Backtest vs. actual",`One-step-ahead · ${indices.length} of ${h} historical ${r.periodName.toLowerCase()} periods`,
+    `<div class="btmetrics">MAPE Official: ${mapeO==null?"—":pct(mapeO)} · MAPE Best: ${mapeB==null?"—":pct(mapeB)}</div>
+     <div class="tabs"><span style="font-size:.76rem;color:#6e7a90;align-self:center;margin-right:6px">Range:</span>${rangeSel}</div>
+     ${table(["Período","Actual",`Official (${r.officialMethod})`,`Best (${r.bestMethod})`,"Error Official","Error Best"],rows)}`,true);
+}
+function versionsPanel(){
+  const hist=S.history;
+  let body;
+  if(hist===null)body='<div class="btmetrics">Loading saved versions…</div>';
+  else if(S.historyError)body=`<div class="btmetrics"><span class="warn">${esc(S.historyError)}</span></div>`;
+  else if(!hist.length)body='<div class="btmetrics">No saved versions yet. Press Save to create one.</div>';
+  else body=table(["Saved at","Default","Overrides","Load"],hist.map(s=>`<tr><td><b>${esc(s.savedAt)}</b></td><td>${esc(s.default)}</td><td>${Object.keys(s.periods||{}).length}</td><td><button class="btn" data-load="${esc(s.snapshot_id)}">Load</button></td></tr>`));
+  return panelDetails(`Saved versions (${hist===null?"…":hist.length})`,"Snapshots in data/official.json.history · loading a version does not create a new snapshot or CSV row",body,true,true);
+}
+function calculations(r){
+  const keys=Object.keys(r.methods),off=S.official,res=r.official,a=r.assumptions,short=k=>r.methods[k].split(" (")[0];
+  const fv=forecastView(r),bestM=r.bestMethod||r.scores[0].method,officialM=r.officialMethod||r.method||bestM;
+  const head=[r.periodName,"Method","Calculated","Manual","Official","Required HC","Edited"];
+  const rows=r.futureLabels.map((lab,i)=>{
+    const o=res[i],st=r.staff[i]||{},cur=(off.periods[i]&&off.periods[i].method)||"";
+    return `<tr>
+      <td><b>${esc(lab)}</b></td>
+      <td><select data-oi="${i}"><option value="">Auto (${esc(short(bestM))})</option>${keys.map(k=>`<option value="${k}" ${cur===k?"selected":""}>${esc(short(k))}</option>`).join("")}</select></td>
+      <td>${fmt(r.comparison[o.method][i])}</td>
+      <td><input type="number" min="0" step="1" data-man="${i}" value="${o.manual!=null?Math.round(o.manual):""}" placeholder="auto" style="width:90px"></td>
+      <td><b>${fmt(o.value)}</b></td>
+      <td>${st.required!=null?st.required:""}</td>
+      <td>${o.overridden?'<i class="best">edited</i>':""}</td>
+    </tr>`;
+  });
+  const overrides=Object.keys(off.periods).length,dirty=officialDirty();
+  const badge=dirty?'<span class="official-badge dirty">Unsaved changes</span>':(r.officialSaved?'<span class="official-badge">Saved ✓</span>':"");
+  const firstFuture=r.futureLabels[0]||"—",lastFuture=r.futureLabels.length?r.futureLabels[r.futureLabels.length-1]:"—";
+  const firstHist=r.history.length?r.history[0].label:"—",lastHist=r.history.length?r.history[r.history.length-1].label:"—";
+  const banner=`<div class="notice"><span><b>Statistical best: ${esc(bestM)}. Official: ${esc(officialM)}.</b><small>Edit any future period below and press Save.</small></span></div>`;
+  return `<div class="recommend"><span><b>Rolling official forecast</b><small>Default: ${esc(r.methods[r.method])}. Choose a method per period, type a manual volume when you know it, then Save. The chart and every headcount view use this official forecast.</small></span>
+    <span class="tools"><select id="offDefault"><option value="auto" ${off.default==="auto"?"selected":""}>Default: statistical best</option>${keys.map(k=>`<option value="${k}" ${off.default===k?"selected":""}>${esc(r.methods[k])}</option>`).join("")}</select><button class="btn primary" id="offSave"${dirty?"":" disabled"}>Save</button><button class="btn" id="offReset">Reset${overrides?" "+overrides+" override"+(overrides>1?"s":""):""}</button><button class="btn" id="offCsv">Download forecast history (CSV)</button>${badge}</span></div>
+  ${panel("History vs. official forecast",`Actual + one-step-ahead official backtest + statistical best · next ${r.horizon} ${r.periodName.toLowerCase()}s${fv.offOk?"":" · Backtest no disponible"}`,chart(fv.labels,fv.series,380),true)}
+  ${banner}
+  ${panel("Period-by-period selection","Pick one method per period (or Auto = statistical best) and optionally type a manual volume. Only the future is editable; the historical range is a projection. The official value feeds every headcount view; press Save to persist it on the server.",
+    `<div class="horizon"><span><b>Editable:</b> ${esc(firstFuture)} → ${esc(lastFuture)} (${r.horizon} ${r.periodName.toLowerCase()}s)</span><span><b>Histórico:</b> ${esc(firstHist)} → ${esc(lastHist)} (solo proyección, no editable)</span></div>`+table(head,rows),true)}
+  ${backtestPanel(r)}
+  ${versionsPanel()}
+  ${panel(`${r.horizon}-${r.periodName.toLowerCase()} calculation ledger`,"Every intermediate value used to produce the staffing requirement (official forecast)",
+    table([r.periodName,"Channel","Method","Forecast","Off-hours share","Regular / Off volume","Productive min.","Raw HC reg. / off","Baseline reg. / off","Required","Paid","Gap"],
+      r.ledger.map(x=>`<tr><td><b>${esc(x.period)}</b></td><td>${chName(x.channel)}</td><td>${esc(short(x.method))}</td><td>${fmt(x.volume)}</td><td>${pct(x.offShare)}</td><td>${fmt(x.regularVolume)} / ${fmt(x.offVolume)}</td><td>${fmt(x.productiveMinutes)}</td><td>${x.regularCalc} / ${x.offCalc}</td><td>${x.regularPaid} / ${x.offPaid}</td><td>${x.required}</td><td>${x.available}</td><td>${gapTag(x.gap)}</td></tr>`)),true)}
+  ${panel("Assumptions in use","Values applied to every row above",table(["AHT","Utilization","Capacity days","Hours/day","Voice shrinkage","Chat shrinkage","Email shrinkage","Chat concurrency"],[`<tr><td>${a.aht} min</td><td>${a.util}%</td><td>${r.periodDays}</td><td>${a.hours}</td><td>${a.shrinkVoice}%</td><td>${a.shrinkMessaging}%</td><td>${a.shrinkEmail}%</td><td>${a.concurrency}</td></tr>`]),true)}`;
+}
+
+function data(r){
+  const g=S.explorerGrain,rows=r.explorer[g],name={daily:"Day",weekly:"Week",monthly:"Month"}[g];
+  const total=rows.reduce((s,x)=>s+x.total,0),off=rows.reduce((s,x)=>s+x.off,0),peak=rows.reduce((m,x)=>x.total>m.total?x:m,rows[0]||{total:0,label:"-"});
+  const hasDaily=r.explorer.daily.length>r.explorer.weekly.length;
+  return `<div class="notice"><span><b>${esc(S.form)} · ${esc(S.business)} · actual data</b><small>${rows.length} ${name.toLowerCase()}s · ${esc(S.status)}${hasDaily?"":" · Daily detail needs rows with a Created time (sample data is weekly only)"}</small></span></div>
+  <div class="metrics">
+    <div class="metric"><span class="blue">Σ</span><div><p>Total tickets</p><strong>${fmt(total)}</strong><small>${rows.length} ${name.toLowerCase()}s</small></div></div>
+    <div class="metric"><span class="blue">x̄</span><div><p>Average per ${name.toLowerCase()}</p><strong>${fmt(rows.length?total/rows.length:0)}</strong><small>all channels</small></div></div>
+    <div class="metric"><span class="green">▲</span><div><p>Peak ${name.toLowerCase()}</p><strong>${fmt(peak.total)}</strong><small>${esc(peak.label)}</small></div></div>
+    <div class="metric"><span class="red">☾</span><div><p>Weekend / midnight</p><strong>${pct(total?off/total*100:0)}</strong><small>${fmt(off)} tickets</small></div></div>
+  </div>
+  ${panel("Actual volume by "+name.toLowerCase(),"Voice, Chat and Email stacked as separate lines",
+    `<div class="tabs">${["daily","weekly","monthly"].map(k=>`<button data-g="${k}" class="${k===g?"active":""}">${{daily:"Day",weekly:"Week",monthly:"Month"}[k]}</button>`).join("")}</div>`
+    +chart(rows.map(x=>x.label),[{name:"Total",data:rows.map(x=>x.total),type:"area",color:"#5b67f1",width:3},{name:"Voice",data:rows.map(x=>x.Voice),type:"line",color:"#15a889"},{name:"Chat",data:rows.map(x=>x.Messaging),type:"line",color:"#f59e0b"},{name:"Email",data:rows.map(x=>x.Email),type:"line",color:"#ec4899"}],340),true)}
+  ${panel(name+" detail","Every period in the loaded data for the current filters",
+    table([name,"Voice","Chat","Email","Unspecified","Total","Off-hours","Off %"],rows.map(x=>`<tr><td><b>${esc(x.label)}</b></td><td>${fmt(x.Voice)}</td><td>${fmt(x.Messaging)}</td><td>${fmt(x.Email)}</td><td>${fmt(x.Unspecified)}</td><td><b>${fmt(x.total)}</b></td><td>${fmt(x.off)}</td><td>${pct(x.total?x.off/x.total*100:0)}</td></tr>`)),true)}`;
+}
+
+function staffing(r){
+  const a=S.a,fields=[["Average handling time","aht","minutes"],["Utilization","util","%"],["Voice shrinkage","shrinkVoice","%"],["Chat shrinkage","shrinkMessaging","%"],["Email shrinkage","shrinkEmail","%"],["Productive hours","hours","per day"],["Working days","days","per month"],["Chat concurrency","concurrency","simultaneous"],["Paid Voice HC","availableVoice","agents"],["Paid Chat HC","availableMessaging","agents"],["Paid Email HC","availableEmail","agents"],["Voice weekend/midnight HC","offVoice","agents"],["Chat weekend/midnight HC","offMessaging","agents"]];
+  return panel(`${S.form} planning assumptions`,`Paid headcount for ${S.business}: ${a.availableVoice+a.availableMessaging+a.availableEmail} total · ${r.periodName} view`,
+    `<div class="assumptions">${fields.map(([l,k,u])=>`<label>${l}<small>${u}</small><input type="number" min="0" step="any" data-k="${k}" value="${a[k]}"></label>`).join("")}</div>
+     <div class="formula"><span><b>Channel mapping and formula</b><small>Email includes Email, API, Web, and Mobile. Chat includes Messaging/Chat. Headcount = Volume × AHT ÷ productive capacity using ${r.periodDays} capacity day${r.periodDays==1?"":"s"} for this view. Utilization ${a.util}% for new tickets; shrinkage applied separately. Equinox retains 5 Voice and 1 Chat agents for weekend/midnight coverage; Kipu headcount is assigned to Voice.</small></span></div>`,true)
+  +panel(`${chName(S.channel)} required versus paid headcount`,`${r.periodName} staffing gap across the forecast horizon`,chart(r.staff.map(x=>x.period),[{name:"Required HC",data:r.staff.map(x=>x.required),type:"bar",color:"#5b67f1"},{name:"Paid HC",data:r.staff.map(x=>x.available),type:"line",color:"#10a37f",width:3}],320),true)
+  +panel("Staffing plan",`${S.form} · ${chName(S.channel)} capacity and ${r.periodName.toLowerCase()} hiring gap`,table([r.periodName,"Forecast","AHT","Capacity","Occupancy","Required HC","Paid HC","Gap"],r.staff.map(x=>`<tr><td><b>${esc(x.period)}</b></td><td>${fmt(x.value)}</td><td>${a.aht}m</td><td>${fmt(x.capacity)}</td><td>${pct(x.occupancy)}</td><td>${x.required}</td><td>${x.available}</td><td>${gapTag(x.gap,"Hire ")}</td></tr>`)),true);
+}
+
+/* ---------- official forecast: estado, guardado y overrides ---------- */
+function stableJSON(v){
+  if(Array.isArray(v))return "["+v.map(stableJSON).join(",")+"]";
+  if(v&&typeof v==="object")return "{"+Object.keys(v).sort().map(k=>JSON.stringify(k)+":"+stableJSON(v[k])).join(",")+"}";
+  return JSON.stringify(v);
+}
+function officialDirty(){
+  const a=S.official||{},b=S.savedOfficial||{};
+  return stableJSON({default:a.default||"auto",periods:a.periods||{}}) !==
+         stableJSON({default:b.default||"auto",periods:b.periods||{}});
+}
+function setPer(i,patch){
+  const p=S.official.periods[i]||{};
+  Object.assign(p,patch);
+  if(!p.method)delete p.method;
+  if(p.manual==null||p.manual==="")delete p.manual;
+  if(Object.keys(p).length)S.official.periods[i]=p;else delete S.official.periods[i];
+  refresh();
+}
+let _historyReq=null;
+async function loadHistory(force=false){
+  if(_historyReq&&!force)return _historyReq;
+  _historyReq=(async()=>{
+    try{
+      const resp=await fetch("/api/official/history");
+      if(!resp.ok)throw new Error("Could not load saved versions.");
+      const data=await resp.json();
+      S.history=Array.isArray(data)?data:[];
+      S.historyError="";
+    }catch(e){
+      S.historyError=e.message;
+      if(S.history===null)S.history=[];
+    }finally{
+      _historyReq=null;
+      if(S.page==="calculations")render();
+    }
+  })();
+  return _historyReq;
+}
+function ensureHistory(){
+  if(S.history===null&&!S.historyError)loadHistory();
+}
+async function saveOfficialToServer(){
+  const payload={default:S.official.default,periods:S.official.periods,context:{channel:S.channel,form:S.form,business:S.business,grain:S.grain,params:S.params,assumptions:S.a}};
+  try{applyState(await api("/api/official",payload));S.error="";await loadHistory(true);}
+  catch(e){S.error=e.message;}
+  await refresh();
+}
+async function resetOfficial(){
+  S.official={default:"auto",periods:{}};
+  try{applyState(await api("/api/official/reset",{}));S.error="";}
+  catch(e){S.error=e.message;}
+  await refresh();
+}
+async function loadSnapshot(id){
+  try{applyState(await api("/api/official/load/"+encodeURIComponent(id),{}));S.error="";await loadHistory(true);}
+  catch(e){S.error=e.message;}
+  await refresh();
+}
+async function downloadHistoryCsv(){
+  try{
+    const resp=await fetch("/api/official/history/csv");
+    if(!resp.ok)throw new Error("Could not download the forecast history.");
+    const url=URL.createObjectURL(await resp.blob());
+    const a=document.createElement("a");
+    a.href=url;a.download="forecast_history.csv";
+    document.body.appendChild(a);a.click();a.remove();
+    setTimeout(()=>URL.revokeObjectURL(url),1000);
+  }catch(e){S.error=e.message;render();}
+}
+
+/* ---------- render + eventos ---------- */
+function render(){
+  document.getElementById("nav").innerHTML=NAV.map(([id,l],i)=>`<button data-page="${id}" class="${S.page===id?"active":""}"><em>${i+1}</em>${l}</button>`).join("");
+  document.getElementById("title").textContent=NAV.find(n=>n[0]===S.page)[1];
+  document.getElementById("status").textContent=S.status;
+      const linked=!!(S.source&&S.source.url);
+  document.getElementById("sheetBtn").textContent=linked?"Refresh from Google Sheets":"Connect Google Sheets";
+  document.getElementById("linkBtn").style.display=linked?"block":"none";
+  document.getElementById("srcMode").value=S.srcMode;
+  document.getElementById("srcSheet").style.display=S.srcMode==="sheet"?"block":"none";
+  document.getElementById("srcFile").style.display=S.srcMode==="file"?"block":"none";
+  document.getElementById("srcPaste").style.display=S.srcMode==="paste"?"block":"none";
+  const names={sample:"Sample data (built-in)",sheet:"Google Sheets",file:"Uploaded file",paste:"Pasted data"};
+  document.getElementById("srcInfo").innerHTML="Active: <b>"+esc(names[S.origin]||S.origin)+"</b>"+(S.synced?" · updated "+esc(S.synced):"")+(S.origin!=="sample"&&S.srcMode!==S.origin&&S.srcMode!=="sheet"?"<br>Loading from this mode will replace the current data.":"");
+  const fs=document.getElementById("form");fs.innerHTML=S.forms.map(f=>`<option ${f===S.form?"selected":""}>${esc(f)}</option>`).join("");
+  document.getElementById("business").value=S.business;document.getElementById("grain").value=S.grain;document.getElementById("channel").value=S.channel;
+  const v=document.getElementById("view");
+  if(!S.res){v.innerHTML=S.error?`<div class="error">${esc(S.error)}</div>`:"";return;}
+    v.innerHTML=(S.error?`<div class="error">${esc(S.error)}</div>`:"")+({overview,data,methods,calculations,staffing})[S.page](S.res);
+  const ov=document.getElementById("override");if(ov)ov.onchange=e=>{S.override=e.target.value;refresh();};
+  const ins=document.getElementById("inspect");if(ins)ins.onchange=e=>{S.inspect=e.target.value;refresh();};
+  v.querySelectorAll("input[data-p]").forEach(inp=>inp.onchange=e=>{S.params[e.target.dataset.p]=Number(e.target.value);refresh();});
+  const rp=document.getElementById("resetParams");if(rp)rp.onclick=()=>{S.params={...S.defaultParams};refresh();};
+  v.querySelectorAll("button[data-g]").forEach(b=>b.onclick=()=>{S.explorerGrain=b.dataset.g;render();});
+  v.querySelectorAll("input[data-k]").forEach(inp=>inp.onchange=e=>{S.a[e.target.dataset.k]=Number(e.target.value);refresh();});
+  const od=document.getElementById("offDefault");if(od)od.onchange=e=>{S.official.default=e.target.value;refresh();};
+  const osave=document.getElementById("offSave");if(osave)osave.onclick=saveOfficialToServer;
+  const oreset=document.getElementById("offReset");if(oreset)oreset.onclick=resetOfficial;
+  const ocsv=document.getElementById("offCsv");if(ocsv)ocsv.onclick=downloadHistoryCsv;
+  const btr=document.getElementById("btRange");if(btr)btr.onchange=e=>{S.backtestRange=e.target.value;render();};
+  v.querySelectorAll("button[data-load]").forEach(b=>b.onclick=()=>loadSnapshot(b.dataset.load));
+  v.querySelectorAll("select[data-oi]").forEach(s=>s.onchange=e=>setPer(e.target.dataset.oi,{method:e.target.value||null}));
+  v.querySelectorAll("input[data-man]").forEach(inp=>inp.onchange=e=>setPer(e.target.dataset.man,{manual:e.target.value===""?null:Number(e.target.value)}));
+  ensureHistory();
+}
+document.getElementById("nav").onclick=e=>{const b=e.target.closest("button");if(b){S.page=b.dataset.page;render();}};
+document.getElementById("form").onchange=e=>{S.form=e.target.value;refresh();};
+document.getElementById("business").onchange=e=>{S.business=e.target.value;Object.assign(S.a,S.baselines[S.business]||{});refresh();};
+document.getElementById("grain").onchange=e=>{S.grain=e.target.value;refresh();};
+document.getElementById("channel").onchange=e=>{S.channel=e.target.value;refresh();};
+document.getElementById("file").onchange=async e=>{const f=e.target.files[0];if(!f)return;try{applyState(await api("/api/upload",await f.text()));S.error="";}catch(err){S.error=err.message}e.target.value="";refresh();};
+document.getElementById("srcMode").onchange=function(e){S.srcMode=e.target.value;render();};
+document.getElementById("sheetBtn").onclick=()=>{
+  document.getElementById("modal").innerHTML=`<div class="backdrop" id="bd"><section class="modal"><h2>Connect Google Sheets</h2><p>Refresh the forecast whenever Incoming changes. Both a shared-sheet link and Google's published CSV link are supported. Each data row counts as one ticket.</p>
+  <label>Google Sheet or published CSV URL<input id="gurl" placeholder="[https://docs.google.com/spreadsheets/d/e/…/pub?output=csv"></label>](https://docs.google.com/spreadsheets/d/e/…/pub?output=csv"></label>)
+  <label>Data tab<input id="gtab" value="Incoming"></label>
+  <p style="margin-top:12px">Expected columns A–I: Ticket ID · Created time · Ticket form · Ticket channel · Equinox or Kipu · Ticket Skills · Handle time · Wait time · Week</p>
+  <footer><button class="btn" id="gcancel">Cancel</button><button class="btn primary" id="gok">Connect and refresh</button></footer></section></div>`;
+  const close=()=>document.getElementById("modal").innerHTML="";
+  document.getElementById("gcancel").onclick=close;document.getElementById("bd").onclick=e=>{if(e.target.id==="bd")close();};
+  document.getElementById("gok").onclick=async()=>{const b=document.getElementById("gok");b.disabled=true;b.textContent="Loading…";
+    try{applyState(await api("/api/sheet",{url:document.getElementById("gurl").value,tab:document.getElementById("gtab").value}));S.error="";close();}
+    catch(err){S.error=err.message;close();}refresh();};
+};
+init();
+/* ---------- Google Sheets ---------- */
+/* ---------- Google Sheets ---------- */
+var sheetModal=document.getElementById("sheetModal");
+
+async function syncSheet(url,tab){
+  document.getElementById("loading").style.display="grid";
+  try{applyState(await api("/api/sheet",{url:url,tab:tab}));S.error="";}
+  catch(err){S.error=err.message;}
+  document.getElementById("loading").style.display="none";
+  refresh();
+}
+function openSheetModal(){
+  var src=S.source||{};
+  document.getElementById("gurl").value=src.url||"";
+  document.getElementById("gtab").value=src.tab||"Incoming";
+  sheetModal.style.display="grid";
+  document.getElementById("gurl").focus();
+}
+function closeSheetModal(){sheetModal.style.display="none";}
+
+document.getElementById("gcancel").onclick=closeSheetModal;
+sheetModal.onclick=function(e){if(e.target===sheetModal)closeSheetModal();};
+document.getElementById("gok").onclick=function(){
+  var u=document.getElementById("gurl").value,t=document.getElementById("gtab").value;
+  closeSheetModal();
+  syncSheet(u,t);
+};
+document.getElementById("linkBtn").onclick=openSheetModal;
+document.getElementById("sheetBtn").onclick=function(){
+  if(S.source&&S.source.url)syncSheet(S.source.url,S.source.tab);
+  else openSheetModal();
+};
+</script>
+</body>
+</html>
